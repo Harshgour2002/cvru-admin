@@ -55,6 +55,8 @@ Production-oriented admin panel for CVRUK backend modules.
 
 Each module supports list, create, edit, delete with confirmation and toasts.
 
+Courses UI now uses structured form inputs (not raw full-payload JSON).
+
 ## Architecture Note
 - `lib/api/client.ts`: shared API client + auth interceptors + centralized API error extraction.
 - `lib/auth/session.ts`: session state with in-memory access token and localStorage refresh token/roles.

@@ -1,10 +1,11 @@
 "use client";
 
-import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 type QueryClientValue = { version: number; bump: () => void };
 
 const QueryContext = createContext<QueryClientValue | null>(null);
+const queryCache = new Map<string, unknown>();
 
 export class QueryClient {}
 
@@ -17,26 +18,38 @@ export function QueryClientProvider({ children }: PropsWithChildren<{ client: Qu
 
 export function useQuery<T>({ queryFn, queryKey }: { queryFn: () => Promise<T>; queryKey: unknown[] }) {
   const ctx = useContext(QueryContext);
-  const [data, setData] = useState<T | undefined>();
-  const [isLoading, setLoading] = useState(true);
-  const [isError, setError] = useState(false);
   const key = JSON.stringify(queryKey);
+  const queryFnRef = useRef(queryFn);
+
+  useEffect(() => {
+    queryFnRef.current = queryFn;
+  }, [queryFn]);
+
+  const cached = queryCache.get(key) as T | undefined;
+  const [data, setData] = useState<T | undefined>(cached);
+  const [isLoading, setLoading] = useState(!cached);
+  const [isError, setError] = useState(false);
 
   useEffect(() => {
     let mounted = true;
-    queryFn()
+    queryFnRef.current()
       .then((res) => {
-        if (mounted) {
-          setData(res);
-          setError(false);
-        }
+        if (!mounted) return;
+        queryCache.set(key, res);
+        setData(res);
+        setError(false);
       })
-      .catch(() => mounted && setError(true))
-      .finally(() => mounted && setLoading(false));
+      .catch(() => {
+        if (mounted) setError(true);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+
     return () => {
       mounted = false;
     };
-  }, [ctx?.version, key, queryFn]);
+  }, [ctx?.version, key]);
 
   return { data, isLoading, isError };
 }
@@ -51,6 +64,7 @@ export function useMutation<TData, TVariables>({ mutationFn, onSuccess }: { muta
       try {
         const result = await mutationFn(payload);
         onSuccess?.();
+        queryCache.clear();
         ctx?.bump();
         return result;
       } finally {
@@ -68,6 +82,7 @@ export function useQueryClient() {
   return {
     invalidateQueries: async (options?: unknown) => {
       void options;
+      queryCache.clear();
       ctx?.bump();
     },
   };
