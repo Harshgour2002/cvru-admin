@@ -16,13 +16,13 @@ Production-oriented admin panel for CVRUK backend modules.
    ```
 2. Configure env:
    ```bash
-   cp .env.example .env.local  # or use committed .env for local default
+   cp env.example .env.local  # or use committed .env for local default
    ```
 3. Update API base url in `.env.local`:
    ```env
    NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
    ```
-   If you omit `http://`/`https://`, the client now auto-normalizes to `http://` at runtime.
+   If you omit `http://`/`https://`, the client auto-normalizes to `http://` at runtime. If the variable is missing, it defaults to `http://localhost:8080`.
 4. Start dev server:
    ```bash
    npm run dev

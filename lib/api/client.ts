@@ -13,6 +13,7 @@ type RequestConfig = {
 };
 
 const configuredBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+const defaultApiBaseUrl = "http://localhost:8080";
 
 function normalizeBaseUrl(url: string) {
   if (!url) return "";
@@ -23,8 +24,7 @@ function normalizeBaseUrl(url: string) {
 function getRuntimeBaseUrl() {
   const normalizedConfigured = normalizeBaseUrl(configuredBaseURL);
   if (normalizedConfigured) return normalizedConfigured;
-  if (typeof window !== "undefined") return window.location.origin;
-  return "http://localhost:3000";
+  return defaultApiBaseUrl;
 }
 
 function buildUrl(path: string, params?: RequestConfig["params"]) {
@@ -94,7 +94,12 @@ async function request<T>(method: HttpMethod, path: string, body?: unknown, conf
 
   const json = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw json;
+    const message =
+      (json as { message?: string; error?: string }).message ||
+      (json as { message?: string; error?: string }).error ||
+      `Request failed with ${response.status} (${response.statusText}) for ${path}. Check NEXT_PUBLIC_API_BASE_URL.`;
+
+    throw { message, status: response.status };
   }
 
   return { data: json as T };
