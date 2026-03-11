@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CVRUK Admin Panel (Next.js)
 
-## Getting Started
+Production-oriented admin panel for CVRUK backend modules.
 
-First, run the development server:
+## Tech Stack
+- Next.js App Router + TypeScript
+- Tailwind CSS
+- TanStack Query
+- Fetch-based API client with JWT refresh interceptor
+- React Hook Form + Zod
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Setup
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Configure env:
+   ```bash
+   cp .env.example .env.local
+   ```
+3. Update API base url in `.env.local`:
+   ```env
+   NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+   ```
+4. Start dev server:
+   ```bash
+   npm run dev
+   ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Routes
+- `/login`
+- `/admin/events`
+- `/admin/news`
+- `/admin/courses`
+- `/admin/sports`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Login Flow
+1. User submits email/password on `/login`.
+2. App calls `POST /api/auth/login`.
+3. `accessToken` is kept in memory; `refreshToken` + roles are kept in localStorage.
+4. Lightweight auth cookie is set for middleware gate to `/admin/*`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Refresh Token Flow
+1. Protected requests include `Authorization: Bearer <accessToken>`.
+2. On 401, API client retry flow calls `POST /api/auth/refresh` once with refresh token.
+3. If refresh succeeds, failed request is retried with new access token.
+4. If refresh fails, session is cleared and user is redirected to `/login`.
 
-## Learn More
+## CRUD Mapping
+- Events → `/api/v1/events` (+ `/upcoming` for list)
+- Latest News → `/api/v1/news-latest`
+- Courses → `/api/v1/courses`
+- Sports → `/api/v1/sports`
 
-To learn more about Next.js, take a look at the following resources:
+Each module supports list, create, edit, delete with confirmation and toasts.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Architecture Note
+- `lib/api/client.ts`: shared API client + auth interceptors + centralized API error extraction.
+- `lib/auth/session.ts`: session state with in-memory access token and localStorage refresh token/roles.
+- `features/*/api.ts`: module-specific TanStack Query hooks for list and mutations.
+- `components/ui/*`: reusable Button/Input/FormField/DataTable/ConfirmDialog primitives.
+- `app/(admin)/admin/*`: route-level module screens with forms and mutation wiring.
+- `lib/shims/*`: local compatibility shims for React Hook Form, resolver, and query APIs used by this project.
