@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith("/admin")) {
     const isAuthed = request.cookies.get("cvru_admin_authenticated")?.value === "true";
     if (!isAuthed) {

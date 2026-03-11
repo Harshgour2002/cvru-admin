@@ -66,7 +66,8 @@ export function useMutation<TData, TVariables>({ mutationFn, onSuccess }: { muta
 export function useQueryClient() {
   const ctx = useContext(QueryContext);
   return {
-    invalidateQueries: async (..._args: unknown[]) => {
+    invalidateQueries: async (options?: unknown) => {
+      void options;
       ctx?.bump();
     },
   };

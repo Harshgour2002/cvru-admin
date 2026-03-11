@@ -16,7 +16,7 @@ Production-oriented admin panel for CVRUK backend modules.
    ```
 2. Configure env:
    ```bash
-   cp .env.example .env.local
+   cp .env.example .env.local  # or use committed .env for local default
    ```
 3. Update API base url in `.env.local`:
    ```env
@@ -38,7 +38,7 @@ Production-oriented admin panel for CVRUK backend modules.
 1. User submits email/password on `/login`.
 2. App calls `POST /api/auth/login`.
 3. `accessToken` is kept in memory; `refreshToken` + roles are kept in localStorage.
-4. Lightweight auth cookie is set for middleware gate to `/admin/*`.
+4. Lightweight auth cookie is set for edge proxy gate to `/admin/*`.
 
 ## Refresh Token Flow
 1. Protected requests include `Authorization: Bearer <accessToken>`.
