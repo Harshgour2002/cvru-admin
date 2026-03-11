@@ -22,7 +22,7 @@ Production-oriented admin panel for CVRUK backend modules.
    ```env
    NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
    ```
-   If you omit `http://`/`https://`, the client auto-normalizes to `http://` at runtime. If the variable is missing, it defaults to `http://localhost:8080`.
+   If you omit `http://`/`https://`, the client auto-normalizes to `http://` at runtime. If the variable is missing, it defaults to `http://localhost:8080`. Additionally, if misconfigured to the frontend origin and a same-origin `/api/*` returns 404, the client retries once against `http://localhost:8080`.
 4. Start dev server:
    ```bash
    npm run dev
