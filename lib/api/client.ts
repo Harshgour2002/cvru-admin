@@ -12,10 +12,23 @@ type RequestConfig = {
   _retry?: boolean;
 };
 
-const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+const configuredBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+
+function normalizeBaseUrl(url: string) {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  return `http://${url}`;
+}
+
+function getRuntimeBaseUrl() {
+  const normalizedConfigured = normalizeBaseUrl(configuredBaseURL);
+  if (normalizedConfigured) return normalizedConfigured;
+  if (typeof window !== "undefined") return window.location.origin;
+  return "http://localhost:3000";
+}
 
 function buildUrl(path: string, params?: RequestConfig["params"]) {
-  const url = new URL(`${baseURL}${path}`);
+  const url = new URL(path, getRuntimeBaseUrl());
   if (params) {
     Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, String(value)));
   }
@@ -31,7 +44,7 @@ async function refreshAccessToken(): Promise<string | null> {
       if (!refreshToken) return null;
 
       try {
-        const response = await fetch(`${baseURL}${endpoints.auth.refresh}`, {
+        const response = await fetch(buildUrl(endpoints.auth.refresh), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ refreshToken }),
@@ -71,7 +84,11 @@ async function request<T>(method: HttpMethod, path: string, body?: unknown, conf
   if (response.status === 401 && !config._retry) {
     const newToken = await refreshAccessToken();
     if (newToken) {
-      return request<T>(method, path, body, { ...config, _retry: true, headers: { ...(config.headers || {}), Authorization: `Bearer ${newToken}` } });
+      return request<T>(method, path, body, {
+        ...config,
+        _retry: true,
+        headers: { ...(config.headers || {}), Authorization: `Bearer ${newToken}` },
+      });
     }
   }
 
