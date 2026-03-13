@@ -92,7 +92,7 @@ export default function EventForm({ eventId, onSaved }: EventFormProps) {
     setError(null);
 
     api
-      .get<EventDetails>(`/api/v1/events/${eventId}`)
+      .get<EventDetails>(`/api/v1/events/upcoming/${eventId}`)
       .then((res) => {
         if (!active) return;
         const data = res.data;
@@ -149,9 +149,23 @@ export default function EventForm({ eventId, onSaved }: EventFormProps) {
     try {
       let id = currentId;
       if (!id) {
-        const created = await api.post<EventDetails>("/api/v1/events", form);
-        id = created.data.id;
+        const fd = new FormData();
+        fd.append("title", form.title);
+        fd.append("subtitle", form.subtitle);
+        fd.append("description", form.description);
+        fd.append("venue", form.venue);
+        fd.append("organisingDepartment", form.organisingDepartment);
+        fd.append("eventDate", form.eventDate);
+        fd.append("eventTime", form.eventTime);
+        if (brochureFile) fd.append("brochure", brochureFile);
+        if (imageFile) fd.append("image", imageFile);
+
+        const created = await api.post<{ data?: EventDetails } | EventDetails>("/api/v1/events", fd);
+        const payload = (created.data as { data?: EventDetails }).data || (created.data as EventDetails);
+        id = payload.id;
         setCurrentId(id);
+        setImageFile(null);
+        setBrochureFile(null);
       } else {
         await api.put(`/api/v1/events/${id}`, form);
       }
@@ -160,11 +174,11 @@ export default function EventForm({ eventId, onSaved }: EventFormProps) {
         throw new Error("Event ID missing after save.");
       }
 
-      if (imageFile) await uploadImage(id);
-      if (brochureFile) await uploadBrochure(id);
+      if (currentId && imageFile) await uploadImage(id);
+      if (currentId && brochureFile) await uploadBrochure(id);
 
       if (isEditMode) {
-        const refreshed = await api.get<EventDetails>(`/api/v1/events/${id}`);
+        const refreshed = await api.get<EventDetails>(`/api/v1/events/upcoming/${id}`);
         setExistingImageUrl(refreshed.data.imageUrl || refreshed.data.image || null);
         setExistingBrochureUrl(refreshed.data.brochureUrl || null);
       }
@@ -256,7 +270,10 @@ export default function EventForm({ eventId, onSaved }: EventFormProps) {
             <span>Drag & drop image here or click to select</span>
             <input type="file" accept="image/*" className="hidden" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
           </label>
-          {imagePreview ? <img src={imagePreview} alt="Event preview" className="mt-2 h-36 w-full rounded-md object-cover" /> : null}
+          {imagePreview ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={imagePreview} alt="Event preview" className="mt-2 h-36 w-full rounded-md object-cover" />
+          ) : null}
           {currentId && (existingImageUrl || imageFile) ? (
             <Button type="button" className="mt-2 bg-red-600 hover:bg-red-500" onClick={removeImage} disabled={removingImage}>
               {removingImage ? "Removing..." : "Remove Image"}

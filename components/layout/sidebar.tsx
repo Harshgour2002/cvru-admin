@@ -7,12 +7,7 @@ import { apiClient } from "@/lib/api/client";
 import { clearSession, getRefreshToken } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
 
-const items = [
-  { href: "/admin/events", label: "Events" },
-  { href: "/admin/news", label: "Latest News" },
-  { href: "/admin/courses", label: "Courses" },
-  { href: "/admin/sports", label: "Sports" },
-];
+const items = [{ href: "/admin/events", label: "Events" }];
 
 export function Sidebar() {
   const pathname = usePathname();

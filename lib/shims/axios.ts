@@ -1,3 +1,5 @@
+import { clearSession, getAccessToken } from "@/lib/auth/session";
+
 export type AxiosResponse<T = unknown> = {
   data: T;
   status: number;
@@ -31,16 +33,31 @@ function buildUrl(url: string, config?: RequestConfig) {
   return fullUrl.toString();
 }
 
+function onUnauthorized() {
+  clearSession();
+  if (typeof window !== "undefined") {
+    window.location.href = "/login";
+  }
+}
+
 async function request<T>(method: string, url: string, data?: unknown, config?: RequestConfig): Promise<AxiosResponse<T>> {
+  const token = getAccessToken();
   const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+
   const response = await fetch(buildUrl(url, config), {
     method,
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(config?.headers || {}),
     },
     body: data ? (isFormData ? (data as FormData) : JSON.stringify(data)) : undefined,
   });
+
+  if (response.status === 401) {
+    onUnauthorized();
+    throw { message: "Session expired. Please login again.", status: 401 };
+  }
 
   const json = await response.json().catch(() => ({}));
   if (!response.ok) {

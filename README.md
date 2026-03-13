@@ -1,6 +1,6 @@
 # CVRUK Admin Panel (Next.js)
 
-Production-oriented admin panel for CVRUK backend modules.
+Production-oriented admin panel currently scoped to Login + Events module.
 
 ## Tech Stack
 - Next.js App Router + TypeScript
@@ -31,9 +31,6 @@ Production-oriented admin panel for CVRUK backend modules.
 ## Routes
 - `/login`
 - `/admin/events`
-- `/admin/news`
-- `/admin/courses`
-- `/admin/sports`
 
 ## Login Flow
 1. User submits email/password on `/login`.
@@ -41,26 +38,19 @@ Production-oriented admin panel for CVRUK backend modules.
 3. `accessToken` is kept in memory; `refreshToken` + roles are kept in localStorage.
 4. Lightweight auth cookie is set for edge proxy gate to `/admin/*`.
 
-## Refresh Token Flow
+## Session Expiry Behavior
 1. Protected requests include `Authorization: Bearer <accessToken>`.
-2. On 401, API client retry flow calls `POST /api/auth/refresh` once with refresh token.
-3. If refresh succeeds, failed request is retried with new access token.
-4. If refresh fails, session is cleared and user is redirected to `/login`.
+2. On 401, session is cleared and user is redirected to `/login`.
 
 ## CRUD Mapping
-- Events → `/api/v1/events` (+ `/upcoming` for list)
-- Latest News → `/api/v1/news-latest`
-- Courses → `/api/v1/courses`
-- Sports → `/api/v1/sports`
+- Events → `/api/v1/events` (+ `/upcoming` and `/upcoming/{id}` for read)
+- Events media → `/api/v1/events/{id}/image` and `/api/v1/events/{id}/brochure`
 
-Each module supports list, create, edit, delete with confirmation and toasts.
-
-Courses UI now uses structured form inputs (not raw full-payload JSON).
+Events module supports list, create, edit, delete and media upload/remove workflows.
 
 ## Architecture Note
 - `lib/api/client.ts`: shared API client + auth interceptors + centralized API error extraction.
 - `lib/auth/session.ts`: session state with in-memory access token and localStorage refresh token/roles.
-- `features/*/api.ts`: module-specific TanStack Query hooks for list and mutations.
 - `components/ui/*`: reusable Button/Input/FormField/DataTable/ConfirmDialog primitives.
 - `app/(admin)/admin/*`: route-level module screens with forms and mutation wiring.
 - `lib/shims/*`: local compatibility shims for React Hook Form, resolver, and query APIs used by this project.
