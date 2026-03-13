@@ -92,7 +92,7 @@ export default function EventForm({ eventId, onSaved }: EventFormProps) {
     setError(null);
 
     api
-      .get<EventDetails>(`/events/${eventId}`)
+      .get<EventDetails>(`/api/v1/events/${eventId}`)
       .then((res) => {
         if (!active) return;
         const data = res.data;
@@ -129,7 +129,7 @@ export default function EventForm({ eventId, onSaved }: EventFormProps) {
     if (!imageFile) return;
     const fd = new FormData();
     fd.append("image", imageFile);
-    await api.post(`/events/${id}/image`, fd);
+    await api.post(`/api/v1/events/${id}/image`, fd);
     setImageFile(null);
   }
 
@@ -137,7 +137,7 @@ export default function EventForm({ eventId, onSaved }: EventFormProps) {
     if (!brochureFile) return;
     const fd = new FormData();
     fd.append("brochure", brochureFile);
-    await api.post(`/events/${id}/brochure`, fd);
+    await api.post(`/api/v1/events/${id}/brochure`, fd);
     setBrochureFile(null);
   }
 
@@ -149,11 +149,11 @@ export default function EventForm({ eventId, onSaved }: EventFormProps) {
     try {
       let id = currentId;
       if (!id) {
-        const created = await api.post<EventDetails>("/events", form);
+        const created = await api.post<EventDetails>("/api/v1/events", form);
         id = created.data.id;
         setCurrentId(id);
       } else {
-        await api.put(`/events/${id}`, form);
+        await api.put(`/api/v1/events/${id}`, form);
       }
 
       if (!id) {
@@ -164,7 +164,7 @@ export default function EventForm({ eventId, onSaved }: EventFormProps) {
       if (brochureFile) await uploadBrochure(id);
 
       if (isEditMode) {
-        const refreshed = await api.get<EventDetails>(`/events/${id}`);
+        const refreshed = await api.get<EventDetails>(`/api/v1/events/${id}`);
         setExistingImageUrl(refreshed.data.imageUrl || refreshed.data.image || null);
         setExistingBrochureUrl(refreshed.data.brochureUrl || null);
       }
@@ -187,7 +187,7 @@ export default function EventForm({ eventId, onSaved }: EventFormProps) {
     setRemovingImage(true);
     setError(null);
     try {
-      await api.delete(`/events/${currentId}/image`);
+      await api.delete(`/api/v1/events/${currentId}/image`);
       setExistingImageUrl(null);
       setImageFile(null);
       setSuccess("Image removed.");
@@ -203,7 +203,7 @@ export default function EventForm({ eventId, onSaved }: EventFormProps) {
     setRemovingBrochure(true);
     setError(null);
     try {
-      await api.delete(`/events/${currentId}/brochure`);
+      await api.delete(`/api/v1/events/${currentId}/brochure`);
       setExistingBrochureUrl(null);
       setBrochureFile(null);
       setSuccess("Brochure removed.");
