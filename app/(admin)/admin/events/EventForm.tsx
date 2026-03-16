@@ -268,22 +268,24 @@ export default function EventForm({ open, mode, eventId, onClose, onSaved, pushT
 
             <div className="md:col-span-2 rounded-lg border border-slate-200 p-4">
               <p className="mb-2 text-sm font-medium">Image Upload</p>
-              <label className="flex min-h-[140px] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500 hover:bg-slate-100">
-                Drag & drop image or click to select
+              <label className="relative flex min-h-[220px] cursor-pointer items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500 hover:bg-slate-100">
+                {imagePreview ? (
+                  <Image src={imagePreview} alt="Event image preview" width={1200} height={500} unoptimized className="h-full w-full object-cover" />
+                ) : (
+                  <span>Drag & drop image or click to select</span>
+                )}
                 <input className="hidden" type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
+                {imagePreview ? <div className="absolute inset-0 bg-black/10" /> : null}
               </label>
               {imagePreview ? (
-                <div className="relative mt-3 overflow-hidden rounded-xl border border-slate-200 shadow-sm">
-                  <Image src={imagePreview} alt="Event image preview" width={1200} height={500} unoptimized className="h-56 w-full object-cover" />
-                  <div className="absolute bottom-3 right-3 flex gap-2">
-                    <label className="cursor-pointer rounded-md bg-slate-900/85 px-3 py-1 text-xs text-white">
-                      Replace
-                      <input className="hidden" type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
-                    </label>
-                    <Button type="button" className="bg-red-600 px-3 py-1 text-xs hover:bg-red-500" onClick={removeImage} disabled={removingImage || (!currentId && !imageFile)}>
-                      {removingImage ? "Removing..." : "Remove"}
-                    </Button>
-                  </div>
+                <div className="mt-3 flex gap-2">
+                  <label className="cursor-pointer rounded-md bg-slate-800 px-3 py-2 text-xs text-white">
+                    Replace Image
+                    <input className="hidden" type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
+                  </label>
+                  <Button type="button" className="bg-red-600 px-3 py-2 text-xs hover:bg-red-500" onClick={removeImage} disabled={removingImage || (!currentId && !imageFile)}>
+                    {removingImage ? "Removing..." : "Remove Image"}
+                  </Button>
                 </div>
               ) : null}
             </div>

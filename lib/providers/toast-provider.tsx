@@ -18,7 +18,7 @@ export function ToastProvider({ children }: PropsWithChildren) {
     setToasts((prev) => [...prev, { id, message, type }]);
     window.setTimeout(() => {
       setToasts((prev) => prev.filter((toast) => toast.id !== id));
-    }, 2500);
+    }, 3000);
   }, []);
 
   const value = useMemo(() => ({ pushToast }), [pushToast]);

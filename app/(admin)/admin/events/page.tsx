@@ -1,7 +1,6 @@
 "use client";
 
-import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import EventForm from "./EventForm";
 import { Button } from "@/components/ui/button";
@@ -50,8 +49,6 @@ export default function EventsPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const imageInputsRef = useRef<Record<number, HTMLInputElement | null>>({});
-  const pdfInputsRef = useRef<Record<number, HTMLInputElement | null>>({});
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
@@ -81,44 +78,6 @@ export default function EventsPage() {
     setDrawerMode("edit");
     setActiveEventId(id);
     setDrawerOpen(true);
-  }
-
-  async function replaceImage(eventId: number, file: File | null) {
-    if (!file) return;
-    try {
-      const fd = new FormData();
-      fd.append("image", file);
-      pushToast("Uploading image...");
-      await api.post(`/api/v1/events/${eventId}/image`, fd);
-      pushToast("Image Updated Successfully");
-      loadEvents();
-    } catch {
-      pushToast("Failed to update image", "error");
-    }
-  }
-
-  async function replacePdf(eventId: number, file: File | null) {
-    if (!file) return;
-    try {
-      const fd = new FormData();
-      fd.append("brochure", file);
-      pushToast("Uploading brochure...");
-      await api.post(`/api/v1/events/${eventId}/brochure`, fd);
-      pushToast("PDF Uploaded Successfully");
-      loadEvents();
-    } catch {
-      pushToast("Failed to upload PDF", "error");
-    }
-  }
-
-  async function deletePdf(eventId: number) {
-    try {
-      await api.delete(`/api/v1/events/${eventId}/brochure`);
-      pushToast("PDF Deleted Successfully");
-      loadEvents();
-    } catch {
-      pushToast("Failed to delete PDF", "error");
-    }
   }
 
   async function confirmDelete() {
@@ -163,68 +122,20 @@ export default function EventsPage() {
 
       {loading ? <p className="text-sm text-slate-500">Loading events...</p> : null}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="space-y-3">
         {events.map((event) => (
-          <Card key={event.id}>
-            <div className="space-y-3">
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100 shadow-sm">
-                {(event.imageUrl || event.image) ? (
-                  <Image
-                    src={event.imageUrl || event.image || ""}
-                    alt={event.title}
-                    width={1200}
-                    height={500}
-                    unoptimized
-                    className="h-44 w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-44 items-center justify-center text-sm text-slate-500">No image</div>
-                )}
-              </div>
-
-              <div>
-                <h3 className="text-lg font-semibold">{event.title}</h3>
-                <p className="text-xs text-slate-500">{event.eventDate}</p>
-                <p className="mt-2 line-clamp-3 text-sm text-slate-600">{event.description || "No description"}</p>
-                <p className="mt-2 text-xs font-medium text-slate-500">{event.brochureUrl ? "📄 Brochure attached" : "No brochure"}</p>
-              </div>
-
-              <input
-                ref={(el) => {
-                  imageInputsRef.current[event.id] = el;
-                }}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => replaceImage(event.id, e.target.files?.[0] || null)}
-              />
-              <input
-                ref={(el) => {
-                  pdfInputsRef.current[event.id] = el;
-                }}
-                type="file"
-                accept="application/pdf"
-                className="hidden"
-                onChange={(e) => replacePdf(event.id, e.target.files?.[0] || null)}
-              />
-
-              <div className="grid grid-cols-2 gap-2">
-                <Button className="bg-slate-700 hover:bg-slate-600" onClick={() => openEdit(event.id)}>Edit</Button>
-                <Button className="bg-red-600 hover:bg-red-500" onClick={() => setDeleteId(event.id)}>Delete</Button>
-                <Button className="bg-slate-700 hover:bg-slate-600" onClick={() => imageInputsRef.current[event.id]?.click()}>Replace Image</Button>
-                <Button className="bg-slate-700 hover:bg-slate-600" onClick={() => pdfInputsRef.current[event.id]?.click()}>
-                  {event.brochureUrl ? "Replace PDF" : "Upload PDF"}
-                </Button>
-                <Button
-                  className="col-span-2 bg-red-600 hover:bg-red-500"
-                  onClick={() => deletePdf(event.id)}
-                  disabled={!event.brochureUrl}
-                >
-                  Delete PDF
-                </Button>
-              </div>
+          <div key={event.id} className="flex flex-col justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-center">
+            <div className="min-w-0">
+              <h3 className="truncate text-lg font-semibold">{event.title}</h3>
+              <p className="text-xs text-slate-500">{event.eventDate}</p>
+              <p className="mt-2 line-clamp-2 text-sm text-slate-600">{event.description || "No description"}</p>
+              <p className="mt-2 text-xs font-medium text-slate-500">{event.brochureUrl ? "📄 Brochure attached" : "No brochure"}</p>
             </div>
-          </Card>
+            <div className="flex shrink-0 gap-2">
+              <Button className="bg-slate-700 hover:bg-slate-600" onClick={() => openEdit(event.id)}>Edit</Button>
+              <Button className="bg-red-600 hover:bg-red-500" onClick={() => setDeleteId(event.id)}>Delete</Button>
+            </div>
+          </div>
         ))}
       </div>
 
