@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Card } from "@/components/ui/card";
@@ -26,8 +27,12 @@ type EventDetails = EventPayload & {
 };
 
 type EventFormProps = {
+  open: boolean;
+  mode: "create" | "edit";
   eventId?: number;
-  onSaved?: (id: number) => void;
+  onClose: () => void;
+  onSaved: () => void;
+  pushToast: (message: string, type?: "success" | "error") => void;
 };
 
 const initialState: EventPayload = {
@@ -44,58 +49,61 @@ const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080",
 });
 
-export default function EventForm({ eventId, onSaved }: EventFormProps) {
-  const isEditMode = typeof eventId === "number";
+function unwrap<T>(payload: unknown): T {
+  if (payload && typeof payload === "object" && "data" in (payload as Record<string, unknown>)) {
+    return (payload as { data: T }).data;
+  }
+  return payload as T;
+}
+
+export default function EventForm({ open, mode, eventId, onClose, onSaved, pushToast }: EventFormProps) {
+  const isEditMode = mode === "edit";
   const [form, setForm] = useState<EventPayload>(initialState);
   const [currentId, setCurrentId] = useState<number | null>(eventId ?? null);
   const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
   const [existingBrochureUrl, setExistingBrochureUrl] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [brochureFile, setBrochureFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [removingImage, setRemovingImage] = useState(false);
   const [removingBrochure, setRemovingBrochure] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   const imagePreview = useMemo(() => {
-    if (imageFile) {
-      return URL.createObjectURL(imageFile);
-    }
+    if (imageFile) return URL.createObjectURL(imageFile);
     return existingImageUrl;
   }, [imageFile, existingImageUrl]);
 
   useEffect(() => {
     return () => {
-      if (imagePreview && imageFile) {
-        URL.revokeObjectURL(imagePreview);
-      }
+      if (imageFile && imagePreview) URL.revokeObjectURL(imagePreview);
     };
-  }, [imagePreview, imageFile]);
+  }, [imageFile, imagePreview]);
 
   useEffect(() => {
+    if (!open) return;
+
+    setError(null);
+    setBrochureFile(null);
+    setImageFile(null);
+
     if (!isEditMode || !eventId) {
       setForm(initialState);
       setCurrentId(null);
       setExistingImageUrl(null);
       setExistingBrochureUrl(null);
-      setImageFile(null);
-      setBrochureFile(null);
-      setError(null);
-      setSuccess(null);
       return;
     }
 
     let active = true;
     setFetching(true);
-    setError(null);
-
     api
-      .get<EventDetails>(`/api/v1/events/upcoming/${eventId}`)
+      .get<unknown>(`/api/v1/events/upcoming/${eventId}`)
       .then((res) => {
         if (!active) return;
-        const data = res.data;
+        const data = unwrap<EventDetails>(res.data);
+        setCurrentId(data.id || eventId);
         setForm({
           title: data.title || "",
           subtitle: data.subtitle || "",
@@ -105,12 +113,13 @@ export default function EventForm({ eventId, onSaved }: EventFormProps) {
           eventDate: data.eventDate || "",
           eventTime: data.eventTime || "",
         });
-        setCurrentId(data.id || eventId);
         setExistingImageUrl(data.imageUrl || data.image || null);
         setExistingBrochureUrl(data.brochureUrl || null);
       })
       .catch(() => {
-        if (active) setError("Failed to load event details.");
+        if (!active) return;
+        setError("Failed to load event details.");
+        pushToast("Failed to load event details", "error");
       })
       .finally(() => {
         if (active) setFetching(false);
@@ -119,7 +128,7 @@ export default function EventForm({ eventId, onSaved }: EventFormProps) {
     return () => {
       active = false;
     };
-  }, [eventId, isEditMode]);
+  }, [open, isEditMode, eventId, pushToast]);
 
   function setField<K extends keyof EventPayload>(key: K, value: EventPayload[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -129,25 +138,41 @@ export default function EventForm({ eventId, onSaved }: EventFormProps) {
     if (!imageFile) return;
     const fd = new FormData();
     fd.append("image", imageFile);
+    pushToast("Uploading image...");
     await api.post(`/api/v1/events/${id}/image`, fd);
-    setImageFile(null);
+    pushToast("Image Updated Successfully");
   }
 
   async function uploadBrochure(id: number) {
     if (!brochureFile) return;
     const fd = new FormData();
     fd.append("brochure", brochureFile);
+    pushToast("Uploading brochure...");
     await api.post(`/api/v1/events/${id}/brochure`, fd);
-    setBrochureFile(null);
+    pushToast("PDF Uploaded Successfully");
   }
 
   async function onSave() {
-    setLoading(true);
+    if (!form.title.trim() || !form.description.trim() || !form.eventDate) {
+      const msg = "Title, description and event date are required.";
+      setError(msg);
+      pushToast(msg, "error");
+      return;
+    }
+
+    if (!isEditMode && !imageFile) {
+      const msg = "Image is required while creating an event.";
+      setError(msg);
+      pushToast(msg, "error");
+      return;
+    }
+
+    setSaving(true);
     setError(null);
-    setSuccess(null);
 
     try {
       let id = currentId;
+
       if (!id) {
         const fd = new FormData();
         fd.append("title", form.title);
@@ -157,56 +182,48 @@ export default function EventForm({ eventId, onSaved }: EventFormProps) {
         fd.append("organisingDepartment", form.organisingDepartment);
         fd.append("eventDate", form.eventDate);
         fd.append("eventTime", form.eventTime);
-        if (brochureFile) fd.append("brochure", brochureFile);
         if (imageFile) fd.append("image", imageFile);
+        if (brochureFile) fd.append("brochure", brochureFile);
 
-        const created = await api.post<{ data?: EventDetails } | EventDetails>("/api/v1/events", fd);
-        const payload = (created.data as { data?: EventDetails }).data || (created.data as EventDetails);
+        pushToast("Saving event...");
+        const created = await api.post<unknown>("/api/v1/events", fd);
+        const payload = unwrap<EventDetails>(created.data);
         id = payload.id;
         setCurrentId(id);
-        setImageFile(null);
-        setBrochureFile(null);
+        pushToast("Event Created Successfully");
       } else {
+        pushToast("Saving event...");
         await api.put(`/api/v1/events/${id}`, form);
+
+        if (imageFile) await uploadImage(id);
+        if (brochureFile) await uploadBrochure(id);
+
+        pushToast("Event Updated Successfully");
       }
 
-      if (!id) {
-        throw new Error("Event ID missing after save.");
-      }
-
-      if (currentId && imageFile) await uploadImage(id);
-      if (currentId && brochureFile) await uploadBrochure(id);
-
-      if (isEditMode) {
-        const refreshed = await api.get<EventDetails>(`/api/v1/events/upcoming/${id}`);
-        setExistingImageUrl(refreshed.data.imageUrl || refreshed.data.image || null);
-        setExistingBrochureUrl(refreshed.data.brochureUrl || null);
-      }
-
-      setSuccess(`Event ${isEditMode ? "updated" : "created"} successfully.`);
-      onSaved?.(id);
+      setImageFile(null);
+      setBrochureFile(null);
+      onSaved();
+      onClose();
     } catch (e) {
-      const msg =
-        (e as { message?: string; error?: string }).message ||
-        (e as { message?: string; error?: string }).error ||
-        "Failed to save event.";
-      setError(msg);
+      const message = (e as { message?: string; error?: string }).message || "Failed to save event.";
+      setError(message);
+      pushToast(message, "error");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   }
 
   async function removeImage() {
     if (!currentId) return;
     setRemovingImage(true);
-    setError(null);
     try {
       await api.delete(`/api/v1/events/${currentId}/image`);
       setExistingImageUrl(null);
       setImageFile(null);
-      setSuccess("Image removed.");
+      pushToast("Image Updated Successfully");
     } catch {
-      setError("Failed to remove image.");
+      pushToast("Failed to remove image", "error");
     } finally {
       setRemovingImage(false);
     }
@@ -215,100 +232,97 @@ export default function EventForm({ eventId, onSaved }: EventFormProps) {
   async function removeBrochure() {
     if (!currentId) return;
     setRemovingBrochure(true);
-    setError(null);
     try {
       await api.delete(`/api/v1/events/${currentId}/brochure`);
       setExistingBrochureUrl(null);
       setBrochureFile(null);
-      setSuccess("Brochure removed.");
+      pushToast("PDF Deleted Successfully");
     } catch {
-      setError("Failed to remove brochure.");
+      pushToast("Failed to remove brochure", "error");
     } finally {
       setRemovingBrochure(false);
     }
   }
 
-  if (fetching) {
-    return <Card><p className="text-sm text-slate-500">Loading event...</p></Card>;
-  }
+  if (!open) return null;
 
   return (
-    <Card>
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xl font-semibold">{isEditMode ? "Edit Event" : "Create Event"}</h2>
-        <span className="text-xs text-slate-500">{isEditMode ? `Event #${currentId ?? eventId}` : "New"}</span>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <FormField label="Title">
-          <Input value={form.title} onChange={(e) => setField("title", e.target.value)} />
-        </FormField>
-        <FormField label="Subtitle">
-          <Input value={form.subtitle} onChange={(e) => setField("subtitle", e.target.value)} />
-        </FormField>
-        <FormField label="Venue">
-          <Input value={form.venue} onChange={(e) => setField("venue", e.target.value)} />
-        </FormField>
-        <FormField label="Organising Department">
-          <Input value={form.organisingDepartment} onChange={(e) => setField("organisingDepartment", e.target.value)} />
-        </FormField>
-        <FormField label="Event Date">
-          <Input type="date" value={form.eventDate} onChange={(e) => setField("eventDate", e.target.value)} />
-        </FormField>
-        <FormField label="Event Time">
-          <Input type="time" value={form.eventTime} onChange={(e) => setField("eventTime", e.target.value)} />
-        </FormField>
-        <div className="md:col-span-2">
-          <FormField label="Description">
-            <Textarea rows={5} value={form.description} onChange={(e) => setField("description", e.target.value)} />
-          </FormField>
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/50">
+      <div className="h-full w-full max-w-2xl overflow-y-auto bg-white p-5 shadow-2xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold">{isEditMode ? "Edit Event" : "Create Event"}</h2>
+          <Button type="button" className="bg-slate-200 text-slate-900" onClick={onClose}>Close</Button>
         </div>
 
-        <div className="md:col-span-1">
-          <p className="mb-1 text-sm font-medium text-slate-700">Image Upload</p>
-          <label className="flex min-h-[120px] cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center text-sm text-slate-500 hover:bg-slate-100">
-            <span>Drag & drop image here or click to select</span>
-            <input type="file" accept="image/*" className="hidden" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
-          </label>
-          {imagePreview ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={imagePreview} alt="Event preview" className="mt-2 h-36 w-full rounded-md object-cover" />
-          ) : null}
-          {currentId && (existingImageUrl || imageFile) ? (
-            <Button type="button" className="mt-2 bg-red-600 hover:bg-red-500" onClick={removeImage} disabled={removingImage}>
-              {removingImage ? "Removing..." : "Remove Image"}
+        {fetching ? <p className="mb-4 text-sm text-slate-500">Loading event details...</p> : null}
+
+        <Card>
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField label="Title"><Input value={form.title} onChange={(e) => setField("title", e.target.value)} /></FormField>
+            <FormField label="Subtitle"><Input value={form.subtitle} onChange={(e) => setField("subtitle", e.target.value)} /></FormField>
+            <FormField label="Venue"><Input value={form.venue} onChange={(e) => setField("venue", e.target.value)} /></FormField>
+            <FormField label="Organising Department"><Input value={form.organisingDepartment} onChange={(e) => setField("organisingDepartment", e.target.value)} /></FormField>
+            <FormField label="Event Date"><Input type="date" value={form.eventDate} onChange={(e) => setField("eventDate", e.target.value)} /></FormField>
+            <FormField label="Event Time"><Input type="time" value={form.eventTime} onChange={(e) => setField("eventTime", e.target.value)} /></FormField>
+            <div className="md:col-span-2"><FormField label="Description"><Textarea rows={4} value={form.description} onChange={(e) => setField("description", e.target.value)} /></FormField></div>
+
+            <div className="md:col-span-2 rounded-lg border border-slate-200 p-4">
+              <p className="mb-2 text-sm font-medium">Image Upload</p>
+              <label className="flex min-h-[140px] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500 hover:bg-slate-100">
+                Drag & drop image or click to select
+                <input className="hidden" type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
+              </label>
+              {imagePreview ? (
+                <div className="relative mt-3 overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+                  <Image src={imagePreview} alt="Event image preview" width={1200} height={500} unoptimized className="h-56 w-full object-cover" />
+                  <div className="absolute bottom-3 right-3 flex gap-2">
+                    <label className="cursor-pointer rounded-md bg-slate-900/85 px-3 py-1 text-xs text-white">
+                      Replace
+                      <input className="hidden" type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
+                    </label>
+                    <Button type="button" className="bg-red-600 px-3 py-1 text-xs hover:bg-red-500" onClick={removeImage} disabled={removingImage || (!currentId && !imageFile)}>
+                      {removingImage ? "Removing..." : "Remove"}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="md:col-span-2 rounded-lg border border-slate-200 p-4">
+              <p className="mb-2 text-sm font-medium">PDF Brochure</p>
+              {!existingBrochureUrl && !brochureFile ? (
+                <label className="inline-flex cursor-pointer rounded-md bg-slate-900 px-3 py-2 text-sm text-white">
+                  Upload PDF
+                  <input className="hidden" type="file" accept="application/pdf" onChange={(e) => setBrochureFile(e.target.files?.[0] || null)} />
+                </label>
+              ) : (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span>📄</span>
+                    <span className="font-medium">{brochureFile?.name || "Current brochure"}</span>
+                    {existingBrochureUrl ? <a href={existingBrochureUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">View PDF</a> : null}
+                    <label className="cursor-pointer rounded-md bg-slate-700 px-2 py-1 text-xs text-white">
+                      Replace
+                      <input className="hidden" type="file" accept="application/pdf" onChange={(e) => setBrochureFile(e.target.files?.[0] || null)} />
+                    </label>
+                    <Button type="button" className="bg-red-600 px-2 py-1 text-xs hover:bg-red-500" onClick={removeBrochure} disabled={removingBrochure || (!currentId && !brochureFile)}>
+                      {removingBrochure ? "Deleting..." : "Delete"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+
+          <div className="mt-4 flex justify-end">
+            <Button type="button" onClick={onSave} disabled={saving || fetching || removingImage || removingBrochure}>
+              {saving ? "Saving event..." : "Save Event"}
             </Button>
-          ) : null}
-        </div>
-
-        <div className="md:col-span-1">
-          <p className="mb-1 text-sm font-medium text-slate-700">Brochure Upload (PDF)</p>
-          <label className="flex min-h-[120px] cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center text-sm text-slate-500 hover:bg-slate-100">
-            <span>Drag & drop brochure PDF or click to select</span>
-            <input type="file" accept="application/pdf" className="hidden" onChange={(e) => setBrochureFile(e.target.files?.[0] || null)} />
-          </label>
-          {brochureFile ? <p className="mt-2 text-sm text-slate-700">Selected: {brochureFile.name}</p> : null}
-          {existingBrochureUrl ? (
-            <a className="mt-2 block text-sm font-medium text-blue-600 underline" href={existingBrochureUrl} target="_blank" rel="noreferrer">
-              Download current brochure
-            </a>
-          ) : null}
-          {currentId && (existingBrochureUrl || brochureFile) ? (
-            <Button type="button" className="mt-2 bg-red-600 hover:bg-red-500" onClick={removeBrochure} disabled={removingBrochure}>
-              {removingBrochure ? "Removing..." : "Remove Brochure"}
-            </Button>
-          ) : null}
-        </div>
+          </div>
+        </Card>
       </div>
-
-      {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
-      {success ? <p className="mt-4 text-sm text-emerald-600">{success}</p> : null}
-
-      <div className="mt-4 flex justify-end">
-        <Button type="button" onClick={onSave} disabled={loading}>
-          {loading ? "Saving..." : "Save"}
-        </Button>
-      </div>
-    </Card>
+    </div>
   );
 }
